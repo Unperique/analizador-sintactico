@@ -541,4 +541,4 @@ if __name__ == '__main__':
 		ast = parse(txt)
 		
 		if not errors_detected():
-			print(ast)
+			print(ast_to_dict(ast))
