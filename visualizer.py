@@ -166,14 +166,26 @@ def main():
     # --- Graphviz ---
     console.rule("[bold]Graphviz[/bold]")
     dot = build_graphviz(ast)
-    out_base = filename.rsplit('.', 1)[0] + '_ast'
+    import os
+    img_dir = 'imagenes_bminor'
+    dot_dir = 'dot_bminor'
+    os.makedirs(img_dir, exist_ok=True)
+    os.makedirs(dot_dir, exist_ok=True)
 
-    # Siempre guardar el archivo .dot
-    dot_path = out_base + '.dot'
+    base_name = os.path.basename(filename).rsplit('.', 1)[0] + '_ast'
+    out_base  = os.path.join(img_dir, base_name)
+    dot_path  = os.path.join(dot_dir, base_name + '.dot')
+
+    # Siempre guardar el archivo .dot en dot_bminor/
     dot.save(dot_path)
     console.print(f"Archivo DOT guardado en: [cyan]{dot_path}[/cyan]")
 
     # Intentar renderizar a PNG (requiere Graphviz instalado en el sistema)
+    import os, shutil
+    # Agregar rutas comunes de Graphviz en Windows si no está en el PATH
+    for _gv_path in [r"C:\Program Files\Graphviz\bin", r"C:\Program Files (x86)\Graphviz\bin"]:
+        if os.path.isdir(_gv_path) and _gv_path not in os.environ.get("PATH", ""):
+            os.environ["PATH"] += os.pathsep + _gv_path
     try:
         dot.render(out_base, format='png', cleanup=True)
         console.print(f"Imagen PNG guardada en:  [cyan]{out_base}.png[/cyan]")

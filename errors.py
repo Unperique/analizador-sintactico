@@ -19,9 +19,9 @@ _errors_detected = 0
 def error(message, lineno=None):
 	global _errors_detected
 	if lineno:
-		print(f'{lineno}: [red]{message}[/red]')
+		print(f'[red]Error en línea {lineno}: {message}[/red]')
 	else:
-		print(f"[red]{message}[/red]")
+		print(f"[red]Error: {message}[/red]")
 	_errors_detected += 1
 	
 def errors_detected():

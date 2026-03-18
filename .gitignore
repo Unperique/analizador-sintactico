@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Graphviz generados
+dot_bminor/
+imagenes_bminor/
+bminor/*_ast
+bminor/*_ast.dot
+bminor/*_ast.png
