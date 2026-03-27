@@ -43,7 +43,7 @@ class Lexer(sly.Lexer):
 
 	@_(r"/\*(.|\n)*?")
 	def malformed_comment(self, t):
-		error("Comentario mal formado, sin cerrar", t.lineno)
+		error("Comentario de bloque no cerrado (falta '*/')", t.lineno, "Error Léxico")
 
 	# Operadores de relacion
 	LE   = r'<='
@@ -99,7 +99,7 @@ class Lexer(sly.Lexer):
 	
 	@_(r"'.")
 	def malformed_char(self, t):
-		error(f"malformado CHAR", t.lineno)
+		error(f"Literal de carácter mal formado: {t.value!r} (falta comilla de cierre o secuencia inválida)", t.lineno, "Error Léxico")
 	
 	@_(r"\d*(\.\d+)?[eE][-+]?[1-9]\d*|\d*\.\d+")
 	def FLOAT_LITERAL(self, t):
@@ -108,7 +108,7 @@ class Lexer(sly.Lexer):
 		
 	@_(r'(0\d+)((\.\d+(e[-+]?\d+)?)|(e[-+]?\d+))')
 	def malformed_float(self, t):
-		error(f"Literal de punto flotante '{t.value}' no sportado", t.lineno)
+		error(f"Literal de punto flotante '{t.value}' no soportado (no usar ceros a la izquierda)", t.lineno, "Error Léxico")
 		
 	@_(r"[1-9]\d*|0")
 	def INTEGER_LITERAL(self, t):
@@ -117,7 +117,7 @@ class Lexer(sly.Lexer):
 
 	@_(r'0\d+')
 	def malformed_integer(self, t):
-		error(f"Literal entera '{t.value}' no sportado", t.lineno)
+		error(f"Literal entera '{t.value}' no soportada (no usar ceros a la izquierda)", t.lineno, "Error Léxico")
 
 	@_(r'\"([^"\\]*(\\.[^"\\]*)*)\"')
 	def STRING_LITERAL(self, t):
@@ -125,7 +125,7 @@ class Lexer(sly.Lexer):
 		return t
 	
 	def error(self, t):
-		error(f"Carcater Ilegal '{t.value[0]}'", t.lineno)
+		error(f"Carácter ilegal '{t.value[0]}'", t.lineno, "Error Léxico")
 		self.index += 1
 
 

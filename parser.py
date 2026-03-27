@@ -484,9 +484,10 @@ class Parser(sly.Parser):
 		pass
 		
 	def error(self, p):
-		lineno = p.lineno if p else 'EOF'
-		value = repr(p.value) if p else 'EOF'
-		error(f'Syntax error at {value}', lineno)
+		if p:
+			error(f"Token inesperado: {p.value!r} (tipo: {p.type})", p.lineno, "Error Sintáctico")
+		else:
+			error("Fin de archivo inesperado (¿falta cerrar un bloque o expresión?)", error_type="Error Sintáctico")
 		
 # ===================================================
 # Utilidad: convertir algo en bloque si no lo es
