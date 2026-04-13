@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Claude Code
+.claude/
+
 # Graphviz generados
 dot_bminor/
 imagenes_bminor/
