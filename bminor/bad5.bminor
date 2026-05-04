@@ -1,4 +1,0 @@
-/* Array as return type does not specify size */
-main: function array [] (a: array [] integer)  {
-    return 0;
-}

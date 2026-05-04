@@ -1,3 +1,0 @@
-main : function integer (args : string) = {
-    return 0;
-}

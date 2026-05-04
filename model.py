@@ -1,172 +1,334 @@
-# model.py
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any, Optional
+from multimethod import multimeta
+
+
+class Visitor(metaclass=multimeta):
+	"""Visitor base basado en multimethod/multimeta."""
+	pass
+	
+	
 class Node:
-    """Clase base para todos los nodos del AST."""
-    def __init__(self):
-        self.lineno = None
-
-    def accept(self, v):
-        return v.visit(self)
-
-# ==============================================================================
-# Declaraciones
-# ==============================================================================
-
-class Program(Node):
-    def __init__(self, decls):
-        super().__init__()
-        self.decls = decls
-
-class VarDecl(Node):
-    def __init__(self, name, datatype, value=None):
-        super().__init__()
-        self.name = name
-        self.datatype = datatype
-        self.value = value
-
-class FuncDecl(Node):
-    def __init__(self, name, datatype, params, body=None):
-        super().__init__()
-        self.name = name
-        self.datatype = datatype
-        self.params = params
-        self.body = body
-
-class Parameter(Node):
-    def __init__(self, name, datatype):
-        super().__init__()
-        self.name = name
-        self.datatype = datatype
-
-# ==============================================================================
+	lineno: int = 0
+	
+	def accept(self, v: Visitor):
+		return v.visit(self)
+		
+		
+# ===================================================
 # Tipos
-# ==============================================================================
+# ===================================================
 
-class SimpleType(Node):
-    def __init__(self, name):
-        super().__init__()
-        self.name = name
 
-class ArrayType(Node):
-    def __init__(self, basetype, size=None):
-        super().__init__()
-        self.basetype = basetype
-        self.size = size
+class Type(Node):
+	name: str = "<type>"
+	
+	def __str__(self) -> str:
+		return self.name
+		
+	def __repr__(self) -> str:
+		return self.name
+		
+	def __eq__(self, other: object) -> bool:
+		return type(self) is type(other) and self.__dict__ == getattr(other, "__dict__", {})
+		
+		
+@dataclass(eq=False)
+class IntegerType(Type):
+	name: str = "integer"
+	
+	
+@dataclass(eq=False)
+class BooleanType(Type):
+	name: str = "boolean"
 
-class FuncType(Node):
-    def __init__(self, returntype, params):
-        super().__init__()
-        self.returntype = returntype
-        self.params = params
 
-# ==============================================================================
-# Sentencias
-# ==============================================================================
+@dataclass(eq=False)
+class FloatType(Type):
+	name: str = "float"
 
+
+@dataclass(eq=False)
+class CharType(Type):
+	name: str = "char"
+	
+	
+@dataclass(eq=False)
+class StringType(Type):
+	name: str = "string"
+	
+	
+@dataclass(eq=False)
+class VoidType(Type):
+	name: str = "void"
+	
+	
+@dataclass(eq=False)
+class ArrayType(Type):
+	base: Type = field(default_factory=IntegerType)
+	size: Optional[int] = None
+	
+	@property
+	def name(self) -> str:
+		return f"array[{self.size if self.size is not None else ''}] {self.base}"
+		
+	def __str__(self) -> str:
+		return self.name
+		
+		
+INT   = IntegerType()
+BOOL  = BooleanType()
+FLOAT = FloatType()
+CHAR  = CharType()
+STRING = StringType()
+VOID  = VoidType()
+
+
+# ===================================================
+# Soporte para Visitor y tabla de símbolos
+# ===================================================
+
+
+@dataclass
+class Symbol:
+	name: str
+	kind: str              # var, const, param, func
+	type: Type
+	node: Any = None
+	mutable: bool = True
+	params: list[Type] = field(default_factory=list)
+	
+	def __repr__(self) -> str:
+		return (
+			f"Symbol(name={self.name!r}, kind={self.kind!r}, type={self.type!r}, "
+			f"mutable={self.mutable!r}, params={self.params!r})"
+		)
+		
+		
+# ===================================================
+# Programa y auxiliares
+# ===================================================
+
+
+@dataclass
+class Program(Node):
+	decls: list[Node]
+	lineno: int = 0
+	
+	
+@dataclass
 class Block(Node):
-    def __init__(self, stmts):
-        super().__init__()
-        self.stmts = stmts
+	stmts: list[Node]
+	lineno: int = 0
+	
+	
+@dataclass
+class Param(Node):
+	name: str
+	type: Type
+	lineno: int = 0
+	
+	
+@dataclass
+class ParamList(Node):
+	params: list[Param]
+	lineno: int = 0
+	
+	
+@dataclass
+class ExprList(Node):
+	exprs: list[Node]
+	lineno: int = 0
+	
+	
+# ===================================================
+# Declaraciones
+# ===================================================
 
-class IfStmt(Node):
-    def __init__(self, cond, then_b, else_b=None):
-        super().__init__()
-        self.cond = cond
-        self.then_b = then_b
-        self.else_b = else_b
 
-class ForStmt(Node):
-    def __init__(self, init, cond, update, body):
-        super().__init__()
-        self.init = init
-        self.cond = cond
-        self.update = update
-        self.body = body
+@dataclass
+class VarDecl(Node):
+	name: str
+	type: Type
+	value: Optional[Node] = None
+	mutable: bool = True
+	lineno: int = 0
+	
+	
+@dataclass
+class ConstDecl(Node):
+	name: str
+	type: Type
+	value: Node
+	lineno: int = 0
+	mutable: bool = False
+	
+	
+@dataclass
+class FuncDecl(Node):
+	name: str
+	parms: ParamList
+	type: Type
+	body: Block
+	lineno: int = 0
+	
+	
+# ===================================================
+# Sentencias
+# ===================================================
 
-class WhileStmt(Node):
-    def __init__(self, cond, body):
-        super().__init__()
-        self.cond = cond
-        self.body = body
 
+@dataclass
+class Assignment(Node):
+	loc: Node
+	expr: Node
+	oper: str = "="
+	lineno: int = 0
+	
+	
+@dataclass
 class PrintStmt(Node):
-    def __init__(self, exprs):
-        super().__init__()
-        self.exprs = exprs
-
+	expr: Node
+	lineno: int = 0
+	
+	
+@dataclass
+class IfStmt(Node):
+	test: Node
+	then_block: Block
+	else_block: Optional[Block] = None
+	lineno: int = 0
+	
+	
+@dataclass
+class WhileStmt(Node):
+	test: Node
+	body: Block
+	lineno: int = 0
+	
+	
+@dataclass
+class ForStmt(Node):
+	init: Optional[Node]
+	test: Optional[Node]
+	step: Optional[Node]
+	body: Block
+	lineno: int = 0
+	
+	
+@dataclass
 class ReturnStmt(Node):
-    def __init__(self, expr=None):
-        super().__init__()
-        self.expr = expr
+	expr: Optional[Node] = None
+	lineno: int = 0
+	
+	
+# ===================================================
+# Expresiones y ubicaciones
+# ===================================================
 
+
+@dataclass
+class Expr(Node):
+	type: Optional[Type] = None
+	lineno: int = 0
+	
+	
+@dataclass
+class VarLoc(Expr):
+	name: str = ""
+	sym: Optional[Symbol] = None
+	lineno: int = 0
+	type: Optional[Type] = None
+	
+	
+@dataclass
+class ArrayLoc(Expr):
+	name: str = ""
+	index: Node = None
+	sym: Optional[Symbol] = None
+	lineno: int = 0
+	type: Optional[Type] = None
+	
+	
+@dataclass
+class FuncCall(Expr):
+	name: str = ""
+	args: ExprList = field(default_factory=lambda: ExprList([]))
+	sym: Optional[Symbol] = None
+	lineno: int = 0
+	type: Optional[Type] = None
+	
+	
+@dataclass
+class BinOp(Expr):
+	oper: str = ""
+	left: Node = None
+	right: Node = None
+	lineno: int = 0
+	type: Optional[Type] = None
+	
+	
+@dataclass
+class UnaryOp(Expr):
+	oper: str = ""
+	expr: Node = None
+	lineno: int = 0
+	type: Optional[Type] = None
+	
+	
+@dataclass
+class IntegerLiteral(Expr):
+	value: int = 0
+	lineno: int = 0
+	type: Optional[Type] = field(default_factory=IntegerType)
+
+
+@dataclass
+class BooleanLiteral(Expr):
+	value: bool = False
+	lineno: int = 0
+	type: Optional[Type] = field(default_factory=BooleanType)
+
+
+@dataclass
+class CharLiteral(Expr):
+	value: str = "\0"
+	lineno: int = 0
+	type: Optional[Type] = field(default_factory=CharType)
+
+
+@dataclass
+class StringLiteral(Expr):
+	value: str = ""
+	lineno: int = 0
+	type: Optional[Type] = field(default_factory=StringType)
+
+
+@dataclass
+class FloatLiteral(Expr):
+	value: float = 0.0
+	lineno: int = 0
+	type: Optional[Type] = field(default_factory=FloatType)
+
+
+# ===================================================
+# Nodos auxiliares no incluidos en el model base
+# ===================================================
+
+@dataclass
 class BreakStmt(Node):
-    def __init__(self):
-        super().__init__()
+	lineno: int = 0
 
+
+@dataclass
 class ContinueStmt(Node):
-    def __init__(self):
-        super().__init__()
+	lineno: int = 0
 
-class ExprStmt(Node):
-    def __init__(self, expr):
-        super().__init__()
-        self.expr = expr
 
-# ==============================================================================
-# Expresiones
-# ==============================================================================
-
-class BinaryOp(Node):
-    def __init__(self, op, left, right):
-        super().__init__()
-        self.op = op
-        self.left = left
-        self.right = right
-
-class UnaryOp(Node):
-    def __init__(self, op, expr):
-        super().__init__()
-        self.op = op
-        self.expr = expr
-
-class PostfixOp(Node):
-    def __init__(self, op, expr):
-        super().__init__()
-        self.op = op
-        self.expr = expr
-
-class AssignOp(Node):
-    def __init__(self, op, lval, expr):
-        super().__init__()
-        self.op = op
-        self.lval = lval
-        self.expr = expr
-
-class Location(Node):
-    def __init__(self, name):
-        super().__init__()
-        self.name = name
-
-class ArrayAccess(Node):
-    def __init__(self, name, index):
-        super().__init__()
-        self.name = name
-        self.index = index
-
-class FuncCall(Node):
-    def __init__(self, name, args):
-        super().__init__()
-        self.name = name
-        self.args = args
-
+@dataclass
 class ArrayLiteral(Node):
-    def __init__(self, exprs):
-        super().__init__()
-        self.exprs = exprs
+	exprs: list
+	lineno: int = 0
 
-class Literal(Node):
-    def __init__(self, value, type_name):
-        super().__init__()
-        self.value = value
-        self.type_name = type_name
