@@ -1,0 +1,142 @@
+# Globals
+DATAS .str0, 80, 114, 105, 109, 111, 115, 32, 104, 97, 115, 116, 97, 58, 32, 0
+DATAS .str1, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 0
+DATAS .str2, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 0
+DATAS .str3, 67, 97, 110, 116, 105, 100, 97, 100, 32, 100, 101, 32, 112, 114, 
+105, 109, 111, 115, 58, 0
+DATAS .str4, 83, 117, 109, 97, 32, 100, 101, 32, 112, 114, 105, 109, 111, 115, 
+58, 0
+
+function is_prime(n:integer) -> boolean
+  ALLOCI n
+  ALLOCI i
+  LOADI n, R1
+  MOVI 1, R2
+  CMPI <=, R1, R2, R3
+  CBRANCH R3, 'Lthen1', 'Lend2'
+  LABEL 'Lthen1'
+  MOVI 0, R4
+  RET R4
+  BRANCH 'Lend3'
+  LABEL 'Lend2'
+  LABEL 'Lend3'
+  LOADI n, R5
+  MOVI 2, R6
+  CMPI ==, R5, R6, R7
+  CBRANCH R7, 'Lthen4', 'Lend5'
+  LABEL 'Lthen4'
+  MOVI 1, R8
+  RET R8
+  BRANCH 'Lend6'
+  LABEL 'Lend5'
+  LABEL 'Lend6'
+  LOADI n, R9
+  MOVI 2, R10
+  DIVI R9, R10, R12
+  MULI R12, R10, R13
+  SUBI R9, R13, R14
+  MOVI 0, R15
+  CMPI ==, R14, R15, R16
+  CBRANCH R16, 'Lthen7', 'Lend8'
+  LABEL 'Lthen7'
+  MOVI 0, R17
+  RET R17
+  BRANCH 'Lend9'
+  LABEL 'Lend8'
+  LABEL 'Lend9'
+  MOVI 3, R18
+  STOREI R18, i
+  LABEL 'Lfor_test10'
+  LOADI i, R19
+  LOADI i, R20
+  MULI R19, R20, R21
+  LOADI n, R22
+  CMPI <=, R21, R22, R23
+  CBRANCH R23, 'Lfor_body11', 'Lfor_end13'
+  LABEL 'Lfor_body11'
+  LOADI n, R24
+  LOADI i, R25
+  DIVI R24, R25, R27
+  MULI R27, R25, R28
+  SUBI R24, R28, R29
+  MOVI 0, R30
+  CMPI ==, R29, R30, R31
+  CBRANCH R31, 'Lthen14', 'Lend15'
+  LABEL 'Lthen14'
+  MOVI 0, R32
+  RET R32
+  BRANCH 'Lend16'
+  LABEL 'Lend15'
+  LABEL 'Lend16'
+  BRANCH 'Lfor_step12'
+  LABEL 'Lfor_step12'
+  LOADI i, R33
+  MOVI 2, R34
+  ADDI R33, R34, R35
+  STOREI R35, i
+  BRANCH 'Lfor_test10'
+  LABEL 'Lfor_end13'
+  MOVI 1, R36
+  RET R36
+
+function main() -> integer
+  ALLOCI n
+  MOVI 2, R37
+  STOREI R37, n
+  ALLOCI limit
+  MOVI 100, R38
+  STOREI R38, limit
+  ALLOCI count
+  MOVI 0, R39
+  STOREI R39, count
+  ALLOCI sum
+  MOVI 0, R40
+  STOREI R40, sum
+  ADDR .str0, R41
+  PRINTS R41
+  LOADI limit, R42
+  PRINTI R42
+  ADDR .str1, R43
+  PRINTS R43
+  LABEL 'Lwhile_test17'
+  LOADI n, R44
+  LOADI limit, R45
+  CMPI <=, R44, R45, R46
+  CBRANCH R46, 'Lwhile_body18', 'Lwhile_end19'
+  LABEL 'Lwhile_body18'
+  LOADI n, R47
+  CALL is_prime, R47, R48
+  CBRANCH R48, 'Lthen20', 'Lend21'
+  LABEL 'Lthen20'
+  LOADI n, R49
+  PRINTI R49
+  LOADI count, R50
+  MOVI 1, R51
+  ADDI R50, R51, R52
+  STOREI R52, count
+  LOADI sum, R53
+  LOADI n, R54
+  ADDI R53, R54, R55
+  STOREI R55, sum
+  BRANCH 'Lend22'
+  LABEL 'Lend21'
+  LABEL 'Lend22'
+  LOADI n, R56
+  MOVI 1, R57
+  ADDI R56, R57, R58
+  STOREI R58, n
+  BRANCH 'Lwhile_test17'
+  LABEL 'Lwhile_end19'
+  ADDR .str2, R59
+  PRINTS R59
+  ADDR .str3, R60
+  PRINTS R60
+  LOADI count, R61
+  PRINTI R61
+  ADDR .str4, R62
+  PRINTS R62
+  LOADI sum, R63
+  PRINTI R63
+  MOVI 0, R64
+  RET R64
+  

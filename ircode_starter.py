@@ -89,13 +89,22 @@ class IRCodeGen(Visitor):
         self.temp_count = 0
         self.label_count = 0
         self.scopes: list[dict[str, Storage]] = []
-        # Pila de (continue_label, break_label) para break/continue dentro de loops
         self.loop_stack: list[tuple[str, str]] = []
+        # Pool de strings: [(label, texto)] → se emiten como DATAS al inicio
+        self.string_pool: list[tuple[str, str]] = []
+        self.str_count = 0
 
     @classmethod
     def generate(cls, node: Program) -> IRProgram:
         gen = cls()
         gen.visit(node)
+        # Anteponer DATAS de strings al bloque global
+        if gen.string_pool:
+            datas = []
+            for label, text in gen.string_pool:
+                bytes_list = [ord(c) for c in text] + [0]   # null-terminated
+                datas.append(("DATAS", label, *bytes_list))
+            gen.program.globals = datas + gen.program.globals
         return gen.program
 
     # -------------------------------------------------
@@ -106,9 +115,10 @@ class IRCodeGen(Visitor):
         self.temp_count += 1
         return f"R{self.temp_count}"
 
-    def new_label(self, prefix: str = "L") -> str:
+    def new_label(self, prefix: str = "") -> str:
+        """Genera labels con prefijo L, igual que el estándar del profe: 'Lthen1', 'Lfor_test10'."""
         self.label_count += 1
-        return f"{prefix}{self.label_count}"
+        return f"L{prefix}{self.label_count}"
 
     def emit(self, *inst) -> None:
         inst = tuple(inst)
@@ -203,7 +213,7 @@ class IRCodeGen(Visitor):
             "-": f"SUB{suffix}",
             "*": f"MUL{suffix}",
             "/": f"DIV{suffix}",
-            "%": f"MOD{suffix}",
+            # '%' se expande como a-(a/b)*b — no hay MODI en el spec
         }
         if oper not in table:
             raise NotImplementedError(f"Aritmética no soportada: {oper}")
@@ -376,9 +386,10 @@ class IRCodeGen(Visitor):
         test_reg = self.visit(node.test)
 
         if node.else_block is not None:
+            # if/else: then → else → merge
             label_then = self.new_label("then")
-            label_else = self.new_label("else")
-            label_end  = self.new_label("endif")
+            label_else = self.new_label("end")
+            label_end  = self.new_label("end")
 
             self.emit("CBRANCH", test_reg, label_then, label_else)
             self.emit("LABEL",   label_then)
@@ -388,20 +399,23 @@ class IRCodeGen(Visitor):
             self.visit(node.else_block)
             self.emit("LABEL",   label_end)
         else:
-            label_then = self.new_label("then")
-            label_end  = self.new_label("endif")
+            # if sin else: siempre 3 labels (then, end_false, merge)
+            label_then      = self.new_label("then")
+            label_end_false = self.new_label("end")
+            label_end       = self.new_label("end")
 
-            self.emit("CBRANCH", test_reg, label_then, label_end)
+            self.emit("CBRANCH", test_reg, label_then, label_end_false)
             self.emit("LABEL",   label_then)
             self.visit(node.then_block)
+            self.emit("BRANCH",  label_end)
+            self.emit("LABEL",   label_end_false)
             self.emit("LABEL",   label_end)
 
     def visit(self, node: WhileStmt):
-        label_test = self.new_label("while")
-        label_body = self.new_label("body")
-        label_end  = self.new_label("endwhile")
+        label_test = self.new_label("while_test")
+        label_body = self.new_label("while_body")
+        label_end  = self.new_label("while_end")
 
-        # continue → volver al test; break → saltar al final
         self.loop_stack.append((label_test, label_end))
 
         self.emit("LABEL", label_test)
@@ -416,16 +430,14 @@ class IRCodeGen(Visitor):
         self.loop_stack.pop()
 
     def visit(self, node: ForStmt):
-        # Inicialización (fuera del loop)
         if node.init is not None:
             self.visit(node.init)
 
-        label_test = self.new_label("for")
-        label_body = self.new_label("forbody")
-        label_step = self.new_label("forstep")   # continue salta aquí (al step)
-        label_end  = self.new_label("endfor")
+        label_test = self.new_label("for_test")
+        label_body = self.new_label("for_body")
+        label_step = self.new_label("for_step")
+        label_end  = self.new_label("for_end")
 
-        # continue → ejecutar step y volver al test; break → saltar al final
         self.loop_stack.append((label_step, label_end))
 
         self.emit("LABEL", label_test)
@@ -434,6 +446,7 @@ class IRCodeGen(Visitor):
             self.emit("CBRANCH", test_reg, label_body, label_end)
         self.emit("LABEL", label_body)
         self.visit(node.body)
+        self.emit("BRANCH", label_step)   # salto explícito al step (como el profe)
         self.emit("LABEL", label_step)
         if node.step is not None:
             self.visit(node.step)
@@ -525,9 +538,19 @@ class IRCodeGen(Visitor):
         out       = self.new_temp()
 
         # Aritmética básica
-        if node.oper in {"+", "-", "*", "/", "%"}:
+        if node.oper in {"+", "-", "*", "/"}:
             opcode = self.binary_arith_opcode(node.oper, left_ty)
             self.emit(opcode, left_reg, right_reg, out)
+            return out
+
+        # Módulo: expandido como a - (a/b)*b  (no existe MODI en el spec)
+        if node.oper == "%":
+            suffix = self.type_suffix(left_ty)
+            quot = self.new_temp()
+            prod = self.new_temp()
+            self.emit(f"DIV{suffix}", left_reg, right_reg, quot)
+            self.emit(f"MUL{suffix}", quot,     right_reg, prod)
+            self.emit(f"SUB{suffix}", left_reg, prod,      out)
             return out
 
         # Comparaciones: < <= > >= == !=
@@ -609,8 +632,12 @@ class IRCodeGen(Visitor):
         return tmp
 
     def visit(self, node: StringLiteral):
+        # Cada ocurrencia crea su propia entrada (igual que el profe)
+        label = f".str{self.str_count}"
+        self.str_count += 1
+        self.string_pool.append((label, node.value))
         tmp = self.new_temp()
-        self.emit("MOVS", node.value, tmp)
+        self.emit("ADDR", label, tmp)
         return tmp
 
     def visit(self, node: ExprList):
